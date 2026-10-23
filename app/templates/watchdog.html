@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Watchdog{% endblock %}
+
+{% block head %}
+  <div>
+    <h1>Watchdog</h1>
+    <p class="sub">A separate program that checks the app every 2 seconds and restarts it if it crashes or freezes.</p>
+  </div>
+  <span class="live" id="live">Live</span>
+{% endblock %}
+
+{% block content %}
+  <div class="status-grid" id="cards"></div>
+
+  <div class="stats">
+    <div class="stat"><b id="restarts">0</b><span>automatic restarts</span></div>
+    <div class="stat"><b id="age">–</b><span>seconds since last check</span></div>
+  </div>
+
+  <h2 class="section-title">Restart history</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Detected</th><th>Diagnosed</th><th>Action taken</th><th>Recovered</th><th>Seconds</th></tr></thead>
+      <tbody id="history"></tbody>
+    </table>
+    <div class="table-empty" id="history-empty" hidden>No restarts yet. Crash or freeze the app from the Chaos page.</div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const { $, esc, api, poll, fmtStamp, WORDS } = MT;
+  let last = null, lastCards = "", lastHistory = "";
+
+  function cardHtml(name, color, detail) {
+    return `<div class="status ${color}"><div class="status-top"><span class="dot"></span>${esc(name)}</div>` +
+      `<div class="status-word">${WORDS[color]}</div><div class="status-detail">${esc(detail)}</div></div>`;
+  }
+
+  function render(d, unreachable) {
+    let wd, app;
+    if (d.alive && d.state === "paused") {
+      wd = ["amber", "Paused: self-healing is switched off."];
+      app = ["amber", "Running unguarded. Nothing would restart it."];
+    } else if (!d.alive) {
+      wd = ["red", "No heartbeat. The app is unguarded."];
+      app = ["amber", "Running, but nothing would restart it."];
+    } else {
+      wd = ["green", "Alive and checking."];
+      app = d.state === "healthy" ? ["green", "Responding on port 5000."]
+          : (d.state === "suspect" || d.state === "starting") ? ["amber", d.detail]
+          : ["red", d.detail];
+    }
+    if (unreachable) app = ["red", "Not responding. The watchdog is restarting it…"];
+
+    const cards = cardHtml("Watchdog", wd[0], wd[1]) + cardHtml("App being guarded", app[0], app[1]);
+    if (cards !== lastCards) { $("#cards").innerHTML = cards; lastCards = cards; }
+
+    $("#restarts").textContent = d.restarts;
+    $("#age").textContent = d.age == null ? "–" : d.age;
+    $("#history-empty").hidden = d.history.length > 0;
+    const hist = d.history.map(i =>
+      `<tr><td class="num">${fmtStamp(i.detected_at)}</td><td>${esc(i.diagnosis)}</td><td>${esc(i.action)}</td>` +
+      `<td class="num">${i.recovered_at ? fmtStamp(i.recovered_at) : '<span class="tag amber">In progress</span>'}</td>` +
+      `<td class="num">${i.recovery_seconds == null ? "—" : i.recovery_seconds}</td></tr>`).join("");
+    if (hist !== lastHistory) { $("#history").innerHTML = hist; lastHistory = hist; }
+  }
+
+  poll(async () => {
+    try {
+      last = await api("/api/watchdog");
+      render(last, false);
+      $("#live").textContent = "Live";
+      $("#live").classList.remove("is-off");
+    } catch (e) {
+      if (last) render(last, true);
+      $("#live").textContent = "Can't reach the app";
+      $("#live").classList.add("is-off");
+    }
+  }, 1000);
+})();
+</script>
+{% endblock %}
