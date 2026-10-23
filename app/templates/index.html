@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block title %}Today{% endblock %}
+
+{% block head %}
+  <div>
+    <h1 id="greeting">Today</h1>
+    <p class="sub" id="datestr"></p>
+  </div>
+  <div class="head-actions">
+    <button class="btn" id="notify-btn" hidden><svg class="ic"><use href="#i-bell"/></svg>Turn on desktop alerts</button>
+    <button class="btn primary" data-open-add><svg class="ic"><use href="#i-plus"/></svg>Add medicine</button>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <div id="notices"></div>
+
+  <section class="blister" id="blister" hidden aria-label="Today's progress">
+    <div class="blister-count" id="blister-count"></div>
+    <div class="cells" id="cells"></div>
+  </section>
+
+  <ol class="doses" id="doses"></ol>
+
+  <div class="empty" id="empty" hidden>
+    <h2>Nothing scheduled yet</h2>
+    <p>Add a medicine and its times, and today's doses will show up here.</p>
+    <button class="btn primary" data-open-add><svg class="ic"><use href="#i-plus"/></svg>Add your first medicine</button>
+  </div>
+
+  <div class="empty" id="alldone" hidden>
+    <h2>All done for today</h2>
+    <p>Every dose has been taken. Your history is saved on the Medicines page.</p>
+    <a class="btn" href="/medicines#taken">See what you've taken</a>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const { $, esc, api, poll, toast } = MT;
+  const lastHtml = { doses: "", cells: "", count: "", notices: "" };
+  const seenDue = new Set();
+  let firstLoad = true;
+
+  const h = new Date().getHours();
+  $("#greeting").textContent = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+  $("#datestr").textContent = new Date().toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" });
+
+  function setHtml(key, el, html) {
+    if (lastHtml[key] !== html) { el.innerHTML = html; lastHtml[key] = html; }
+  }
+  function span(mins) {
+    if (mins < 60) return mins + " min";
+    const hh = Math.floor(mins / 60), mm = mins % 60;
+    return hh + " h" + (mm ? " " + mm + " min" : "");
+  }
+
+  /* ---------- Desktop alerts (work while this tab stays open) ---------- */
+  const notifyBtn = $("#notify-btn");
+  function syncNotifyBtn() {
+    notifyBtn.hidden = !("Notification" in window) || Notification.permission !== "default";
+  }
+  notifyBtn.addEventListener("click", () => {
+    Notification.requestPermission().then(() => {
+      syncNotifyBtn();
+      if (Notification.permission === "granted") toast("Desktop alerts are on.", "ok");
+    });
+  });
+  syncNotifyBtn();
+
+  /* The time struck for a dose that has a reminder set: tell the person, once. */
+  function announce(waiting) {
+    waiting.filter(x => x.armed).forEach(x => {
+      const key = x.id + "|" + x.time;
+      if (seenDue.has(key)) return;
+      seenDue.add(key);
+      if (firstLoad) return;  // already waiting when the page opened: it is visible in the list
+      toast("Time to take " + x.name + " (" + x.dose + ")", "warn", 15000);
+      if ("Notification" in window && Notification.permission === "granted") {
+        try { new Notification("Time to take " + x.name, { body: x.dose + ", due " + x.time }); } catch (e) {}
+      }
+    });
+  }
+
+  function noticeHtml(d) {
+    const out = [];
+    if (d.breaker.state !== "closed") {
+      out.push(["", "alert", "Text reminders are paused because the SMS service isn't answering. " +
+        (d.breaker.state === "open" ? "Next attempt in " + d.breaker.retry_in + "s. " : "Testing it now. ") +
+        "You'll still see reminders here."]);
+    }
+    if (d.pending > 0) {
+      out.push(["", "alert", "You're offline. " + d.pending + (d.pending > 1 ? " doses are" : " dose is") +
+        " saved on this device and will sync automatically."]);
+    } else if (d.online === false) {
+      out.push(["", "alert", "You're offline. Doses you take are saved on this device and will sync automatically."]);
+    }
+    if (d.quarantined > 0) {
+      out.push(["info", "shield", d.quarantined + (d.quarantined > 1 ? " damaged records were" : " damaged record was") +
+        " set aside so the rest of your data stays safe."]);
+    }
+    return out.map(n => `<div class="notice ${n[0]}"><svg class="ic"><use href="#i-${n[1]}"/></svg><span>${esc(n[2])}</span></div>`).join("");
+  }
+
+  /* Before the time: a clock and the bell. When the time strikes: a ringing bell and the Taken button. */
+  function rowHtml(x) {
+    const attrs = `data-id="${x.id}" data-time="${esc(x.time)}" data-name="${esc(x.name)}" data-dose="${esc(x.dose)}"`;
+    let sub = "", icon = "clock", actions = "";
+
+    if (x.state === "scheduled") {
+      sub = '<span class="tag">' + (x.next ? "Up next, in " : "In ") + esc(span(x.due_in)) + "</span>";
+      actions = x.armed
+        ? `<button class="btn sm armed" disabled aria-label="Reminder set for ${esc(x.name)} at ${esc(x.time)}">` +
+          `<svg class="ic"><use href="#i-bell-check"/></svg>Reminder set</button>`
+        : `<button class="btn sm" data-remind ${attrs} aria-label="Remind me to take ${esc(x.name)} at ${esc(x.time)}">` +
+          `<svg class="ic"><use href="#i-bell"/></svg>Remind me</button>`;
+    } else {
+      icon = "bell";
+      sub = x.state === "overdue"
+        ? '<span class="tag red">Overdue by ' + esc(span(x.late_min)) + "</span>"
+        : '<span class="tag">Time to take it</span>';
+      if (x.sms === "sent") sub += '<span class="tag green">SMS sent</span>';
+      if (x.sms === "pending") sub += '<span class="tag amber">SMS waiting</span>';
+      if (x.sms === "failed") sub += '<span class="tag red">SMS failed</span>';
+      actions = `<button class="btn good sm" data-take ${attrs} aria-label="Mark ${esc(x.name)} at ${esc(x.time)} as taken">` +
+        `<svg class="ic"><use href="#i-check"/></svg>Taken</button>`;
+    }
+
+    return `<li class="dose is-${x.state}">` +
+      `<span class="dose-time">${esc(x.time)}</span>` +
+      `<span class="dose-icon"><svg class="ic"><use href="#i-${icon}"/></svg></span>` +
+      `<div class="dose-main"><div class="dose-name">${esc(x.name)}</div>` +
+      `<div class="dose-sub"><span>${esc(x.dose)}</span>${sub}</div></div>` +
+      `<div class="dose-actions">${actions}</div></li>`;
+  }
+
+  function render(d) {
+    setHtml("notices", $("#notices"), noticeHtml(d));
+
+    const waiting = d.doses.filter(x => x.state !== "scheduled");
+    announce(waiting);
+    firstLoad = false;
+    document.title = (waiting.length ? "(" + waiting.length + ") " : "") + "Today · MedTracker";
+
+    $("#empty").hidden = d.total > 0;
+    $("#alldone").hidden = !(d.total > 0 && d.doses.length === 0);
+    $("#blister").hidden = d.total === 0;
+
+    const overdue = waiting.filter(x => x.state === "overdue").length;
+    const next = d.doses.find(x => x.state === "scheduled");
+    let line;
+    if (d.total && d.done === d.total) line = "All done for today.";
+    else if (waiting.length) line = waiting.length + (waiting.length > 1 ? " doses are" : " dose is") + " waiting for you" + (overdue ? " (" + overdue + " overdue)." : ".");
+    else if (next) line = "Up next: " + next.name + " at " + next.time;
+    else line = "Nothing left today.";
+    setHtml("count", $("#blister-count"), `<b>${d.done}</b><span> of ${d.total} taken</span><p>${esc(line)}</p>`);
+
+    setHtml("cells", $("#cells"), d.strip.map(x =>
+      `<span class="cell ${x.taken ? "popped" : ""} ${x.late ? "late" : ""}" title="${esc(x.label)}">` +
+      `<svg class="ic"><use href="#i-${x.taken ? "check" : "pill"}"/></svg></span>`).join(""));
+
+    setHtml("doses", $("#doses"), d.doses.map(rowHtml).join(""));
+  }
+
+  const load = poll(async () => { render(await api("/api/today")); }, 3000);
+  window.addEventListener("meds-changed", load);
+
+  $("#doses").addEventListener("click", async e => {
+    const take = e.target.closest("[data-take]");
+    const remind = e.target.closest("[data-remind]");
+
+    if (take) {
+      take.disabled = true;
+      try {
+        const r = await api("/api/take", { method: "POST", body: { medicine_id: +take.dataset.id, time: take.dataset.time } });
+        toast(r.message, r.ok ? (r.pending ? "warn" : "ok") : "bad");
+        if (r.ok) {
+          take.closest(".dose").classList.add("leaving");
+          await new Promise(res => setTimeout(res, 320));
+        }
+      } catch (err) {
+        toast("Couldn't reach the app, so nothing was saved. Try again in a moment.", "bad");
+      }
+      load();
+    }
+
+    if (remind) {
+      remind.disabled = true;
+      try {
+        const r = await api("/api/remind", { method: "POST",
+          body: { medicine_id: +remind.dataset.id, time: remind.dataset.time } });
+        toast(r.message, r.ok ? "ok" : "bad");
+      } catch (err) {
+        toast("Couldn't reach the app. Try again in a moment.", "bad");
+      }
+      load();
+    }
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Medicines{% endblock %}
+
+{% block head %}
+  <div>
+    <h1>Medicines</h1>
+    <p class="sub">Everything you take, and when.</p>
+  </div>
+  <button class="btn primary" data-open-add><svg class="ic"><use href="#i-plus"/></svg>Add medicine</button>
+{% endblock %}
+
+{% block content %}
+  <div class="med-list" id="meds"></div>
+  <p class="section-sub" id="done-note" hidden></p>
+  <div class="empty" id="empty" hidden>
+    <h2 id="empty-title">No medicines yet</h2>
+    <p id="empty-text">Add your first one and set the times you take it.</p>
+    <button class="btn primary" data-open-add><svg class="ic"><use href="#i-plus"/></svg>Add medicine</button>
+  </div>
+
+  <div class="section-head" id="taken">
+    <h2 class="section-title">Taken</h2>
+    <select class="select" id="filter" aria-label="Show history for" hidden></select>
+  </div>
+  <p class="section-sub">Every dose you've marked as taken, newest first. Medicines you remove stay in this history.</p>
+  <div id="history"></div>
+  <div class="empty" id="history-empty" hidden>
+    <h2>Nothing taken yet</h2>
+    <p>When you press Taken on the Today page, the dose is saved here.</p>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const { $, esc, api, poll, toast, confirmBox, fmtStamp } = MT;
+  let lastMeds = "", lastHist = "", lastNames = "";
+  let historyRows = [];
+
+  function lastTaken(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return "";
+    const hm = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+    if (d.toDateString() === new Date().toDateString()) return "today at " + hm;
+    return d.toLocaleDateString([], { day: "numeric", month: "short" }) + " at " + hm;
+  }
+
+  /* ---------- Your medicines ---------- */
+  function renderMeds(d) {
+    /* A medicine whose doses are all taken today leaves this list. It comes back tomorrow, and its history stays in Taken below. */
+    const active = d.medicines.filter(m => !m.done_today);
+    const hidden = d.medicines.length - active.length;
+    $("#empty").hidden = active.length > 0;
+    $("#empty-title").textContent = hidden ? "All taken for today" : "No medicines yet";
+    $("#empty-text").textContent = hidden ? "Nice work. Everything you take today is in the Taken section below." : "Add your first one and set the times you take it.";
+    const note = $("#done-note");
+    note.hidden = !(hidden && active.length);
+    note.textContent = hidden + (hidden > 1 ? " medicines are" : " medicine is") + " finished for today and hidden. " + (hidden > 1 ? "They'll" : "It'll") + " be back tomorrow.";
+    const html = active.map(m =>
+      `<div class="med"><div>` +
+      `<div class="med-name">${esc(m.name)} <span class="med-dose">· ${esc(m.dose)}</span></div>` +
+      `<div class="times">${m.times.map(t => `<span>${esc(t)}</span>`).join("")}</div>` +
+      `<div class="last-taken">${m.last_taken ? "Last taken " + esc(lastTaken(m.last_taken)) : "Not taken yet"}</div></div>` +
+      `<button class="icon-btn" data-del="${m.id}" data-name="${esc(m.name)}" aria-label="Remove ${esc(m.name)}" title="Remove">` +
+      `<svg class="ic"><use href="#i-trash"/></svg></button></div>`).join("");
+    if (html !== lastMeds) { $("#meds").innerHTML = html; lastMeds = html; }
+  }
+
+  /* ---------- Taken history ---------- */
+  const ymd = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  function dayLabel(day) {
+    const now = new Date(), yest = new Date(); yest.setDate(now.getDate() - 1);
+    if (day === ymd(now)) return "Today";
+    if (day === ymd(yest)) return "Yesterday";
+    const d = new Date(day + "T00:00:00");
+    return isNaN(d) ? day : d.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" });
+  }
+
+  function renderHistory() {
+    const sel = $("#filter");
+    const names = Array.from(new Set(historyRows.map(r => r.name))).sort();
+    const namesKey = names.join("|");
+    if (namesKey !== lastNames) {
+      const keep = sel.value;
+      sel.innerHTML = '<option value="">All medicines</option>' + names.map(n => `<option>${esc(n)}</option>`).join("");
+      sel.value = names.includes(keep) ? keep : "";
+      lastNames = namesKey;
+    }
+    sel.hidden = names.length < 2;
+
+    const rows = sel.value ? historyRows.filter(r => r.name === sel.value) : historyRows;
+    $("#history-empty").hidden = historyRows.length > 0;
+
+    const groups = [];
+    rows.forEach(r => {
+      let g = groups[groups.length - 1];
+      if (!g || g.day !== r.day) { g = { day: r.day, items: [] }; groups.push(g); }
+      g.items.push(r);
+    });
+
+    const html = groups.map(g =>
+      `<div class="day-head">${esc(dayLabel(g.day))}</div><ul class="hist-list">` +
+      g.items.map(r => {
+        const when = r.delay == null ? "" :
+          r.delay <= 15 ? '<span class="tag green">On time</span>' :
+          '<span class="tag amber">' + esc(r.delay >= 60 ? Math.floor(r.delay / 60) + " h " + (r.delay % 60) + " min" : r.delay + " min") + " late</span>";
+        return `<li class="hist"><span class="dose-time">${esc(r.time)}</span><div>` +
+          `<div class="dose-name">${esc(r.name)} <span class="med-dose">· ${esc(r.dose)}</span>` +
+          (r.removed ? ' <span class="tag muted">Removed</span>' : "") + `</div>` +
+          `<div class="dose-sub">Taken at ${esc(r.taken_at.slice(11, 16))} ${when}</div></div></li>`;
+      }).join("") + `</ul>`).join("");
+    if (html !== lastHist) { $("#history").innerHTML = html; lastHist = html; }
+  }
+  $("#filter").addEventListener("change", renderHistory);
+
+  const load = poll(async () => {
+    const [m, h] = await Promise.all([api("/api/medicines"), api("/api/history")]);
+    renderMeds(m);
+    historyRows = h.history;
+    renderHistory();
+  }, 4000);
+  window.addEventListener("meds-changed", load);
+
+  /* ---------- Remove a medicine ---------- */
+  $("#meds").addEventListener("click", async e => {
+    const b = e.target.closest("[data-del]");
+    if (!b) return;
+    const ok = await confirmBox({
+      title: "Remove " + b.dataset.name + "?",
+      text: "It disappears from today's list. Doses you already took stay in the Taken history.",
+      confirm: "Remove"
+    });
+    if (!ok) return;
+    try {
+      const r = await api("/api/medicines/" + b.dataset.del, { method: "DELETE" });
+      toast(r.message, r.ok ? "ok" : "bad");
+    } catch (err) {
+      toast("Couldn't reach the app. Try again in a moment.", "bad");
+    }
+    load();
+  });
+})();
+</script>
+{% endblock %}
