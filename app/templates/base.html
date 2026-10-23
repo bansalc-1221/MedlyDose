@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}MedTracker{% endblock %} · MedTracker</title>
+  <script>
+    try {
+      var t = localStorage.getItem("mt-theme");
+      if (!t && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches) t = "dark";
+      if (t) document.documentElement.setAttribute("data-theme", t);
+    } catch (e) {}
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<!-- Icon set: drawn once, reused everywhere with <use href="#i-name"> -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-today" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.5"/></symbol>
+  <symbol id="i-pill" viewBox="0 0 24 24"><g transform="rotate(-45 12 12)"><rect x="2.5" y="8" width="19" height="8" rx="4"/><path d="M12 8v8"/></g></symbol>
+  <symbol id="i-pulse" viewBox="0 0 24 24"><path d="M3 12h4l2.2-5.5 4.2 11 2.4-5.5H21"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5.2c0 4.6-3 7.8-7 9.8-4-2-7-5.2-7-9.8V6z"/><path d="M9 12l2.2 2.2L15.5 10"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 1112 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 004 0"/></symbol>
+  <symbol id="i-bell-check" viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 0112 0v5l1.5 2h-15z"/><path d="M9.2 11.4l2 2 3.6-3.6"/><path d="M10 20.5a2 2 0 004 0"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17.2v.1"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-contrast" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 000-17z" fill="currentColor"/></symbol>
+</svg>
+
+{% macro nav_item(endpoint, href, icon, label) %}
+  <a href="{{ href }}"{% if request.endpoint == endpoint %} aria-current="page"{% endif %}>
+    <svg class="ic"><use href="#i-{{ icon }}"/></svg><span>{{ label }}</span>
+  </a>
+{% endmacro %}
+
+<div class="topbar">
+  <a class="brand" href="/"><span class="brand-mark"><svg class="ic"><use href="#i-pill"/></svg></span>MedTracker</a>
+  <div class="right">
+    <span class="conn">Connected</span>
+    <button class="theme-btn" data-theme-toggle aria-label="Switch light or dark theme"><svg class="ic"><use href="#i-contrast"/></svg></button>
+  </div>
+</div>
+
+<div class="shell">
+  <aside class="rail">
+    <a class="brand" href="/"><span class="brand-mark"><svg class="ic"><use href="#i-pill"/></svg></span>MedTracker</a>
+    <nav class="nav" aria-label="Main">
+      {{ nav_item("home", "/", "today", "Today") }}
+      {{ nav_item("medicines_page", "/medicines", "pill", "Medicines") }}
+      <div class="nav-divider"></div>
+      {{ nav_item("dashboard", "/dashboard", "pulse", "Health") }}
+      {{ nav_item("watchdog_page", "/watchdog", "shield", "Watchdog") }}
+      {{ nav_item("chaos_page", "/chaos", "bolt", "Chaos") }}
+    </nav>
+    <div class="rail-foot">
+      <span class="conn">Connected</span>
+      <button class="theme-btn" data-theme-toggle><svg class="ic"><use href="#i-contrast"/></svg>Theme</button>
+    </div>
+  </aside>
+
+  <main class="stage">
+    <header class="page-head">{% block head %}{% endblock %}</header>
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+<div id="toasts" aria-live="polite"></div>
+
+<dialog id="add-dialog" aria-labelledby="add-title">
+  <form id="add-form" class="dlg" novalidate>
+    <div class="dlg-head">
+      <h2 id="add-title">Add a medicine</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button>
+    </div>
+    <label class="field">Name<input id="f-name" autocomplete="off" placeholder="Metformin"></label>
+    <label class="field">Dose<input id="f-dose" autocomplete="off" placeholder="500 mg"></label>
+    <div class="field">
+      <label for="f-time">Times of day</label>
+      <div class="time-row">
+        <input id="f-time" type="time">
+        <button type="button" class="btn" id="f-add-time">Add time</button>
+      </div>
+      <div class="chips" id="f-chips"></div>
+    </div>
+    <p class="form-error" id="add-error" role="alert"></p>
+    <div class="dlg-foot">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button class="btn primary" id="add-submit">Save medicine</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="confirm-dialog" aria-labelledby="c-title">
+  <form method="dialog" class="dlg">
+    <h2 id="c-title"></h2>
+    <p id="c-text"></p>
+    <div class="dlg-foot">
+      <button class="btn" value="cancel">Cancel</button>
+      <button class="btn danger" value="ok" id="c-ok">Confirm</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
