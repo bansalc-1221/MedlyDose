@@ -4,8 +4,6 @@ MedTracker helps a person (or a caregiver looking after them) take the right med
 
 A missed or doubled dose can hurt someone, so MedTracker must keep working when things break. It notices failures by itself, works out what went wrong, and recovers with no human restarting anything.
 
-Scenario: our own (option E in the brief), a daily-life, high-stakes health app.
-
 ## Run it
 
 Python 3.10 or newer. In PowerShell, from the project folder:
@@ -72,6 +70,6 @@ mock_sms/server.py, mock_cloud/server.py
 app/  main.py db.py breaker.py sync.py quarantine.py ratelimit.py  static/  templates/
 ```
 
-## AI use
+## License
 
-This project was built with Claude (Anthropic) as a coding assistant. See the AI Use Declaration in the submission for what was asked of it and what the team wrote, changed and checked.
+Released under the [MIT License](LICENSE). Copyright (c) 2026 CHHAVI BANSAL.
