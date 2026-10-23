@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Health{% endblock %}
+
+{% block head %}
+  <div>
+    <h1>System health</h1>
+    <p class="sub">Every part of MedTracker, checked live. Green is normal, amber means it is handling a problem, red means it has failed and has not recovered yet.</p>
+  </div>
+  <span class="live" id="live">Live</span>
+{% endblock %}
+
+{% block content %}
+  <div id="heal-notice"></div>
+  <div class="status-grid" id="cards"></div>
+
+  <div class="stats">
+    <div class="stat"><b id="rec">0</b><span>recoveries</span></div>
+    <div class="stat"><b id="avg">–</b><span>average recovery (s)</span></div>
+    <div class="stat"><b id="max">–</b><span>slowest recovery (s)</span></div>
+  </div>
+
+  <h2 class="section-title">Incident log</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Detected</th><th>Component</th><th>Diagnosed</th><th>Action taken</th><th>Recovered</th><th>Found in (s)</th><th>Back to normal (s)</th></tr>
+      </thead>
+      <tbody id="log"></tbody>
+    </table>
+    <div class="table-empty" id="log-empty" hidden>No incidents yet. Open the Chaos page and break something.</div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const { $, esc, api, poll, fmtStamp, NAMES, WORDS } = MT;
+  let last = null;
+  let lastCards = "", lastLog = "";
+
+  function render(d, unreachable) {
+    const comps = d.components.map(c => Object.assign({}, c));
+    if (unreachable) {
+      comps[0] = { name: "App", color: "red", detail: "Not responding. The watchdog is restarting it…" };
+    }
+    const cards = comps.map(c =>
+      `<div class="status ${c.color}"><div class="status-top"><span class="dot"></span>${esc(c.name)}</div>` +
+      `<div class="status-word">${WORDS[c.color] || ""}</div><div class="status-detail">${esc(c.detail)}</div></div>`).join("");
+    $("#heal-notice").innerHTML = d.healing === false
+      ? '<div class="notice"><svg class="ic"><use href="#i-alert"/></svg><span>Self-healing is switched off. Failures will not be repaired. Switch it back on from the Chaos page.</span></div>' : "";
+    if (cards !== lastCards) { $("#cards").innerHTML = cards; lastCards = cards; }
+
+    $("#rec").textContent = d.recoveries;
+    $("#avg").textContent = d.avg == null ? "–" : d.avg;
+    $("#max").textContent = d.max == null ? "–" : d.max;
+
+    $("#log-empty").hidden = d.incidents.length > 0;
+    const log = d.incidents.map(i =>
+      `<tr><td class="num">${fmtStamp(i.detected_at)}</td><td><span class="tag">${esc(NAMES[i.component] || i.component)}</span></td>` +
+      `<td>${esc(i.diagnosis)}</td><td>${esc(i.action)}</td>` +
+      `<td class="num">${i.recovered_at === "never" ? '<span class="tag red">Not healed</span>' : i.recovered_at ? fmtStamp(i.recovered_at) : '<span class="tag amber">In progress</span>'}</td>` +
+      `<td class="num">${i.detect_seconds == null ? "—" : i.detect_seconds}</td>` +
+      `<td class="num">${i.total_seconds == null ? "—" : i.total_seconds}</td></tr>`).join("");
+    if (log !== lastLog) { $("#log").innerHTML = log; lastLog = log; }
+  }
+
+  poll(async () => {
+    try {
+      last = await api("/api/status");
+      render(last, false);
+      $("#live").textContent = "Live";
+      $("#live").classList.remove("is-off");
+    } catch (e) {
+      if (last) render(last, true);
+      $("#live").textContent = "Can't reach the app";
+      $("#live").classList.add("is-off");
+    }
+  }, 1000);
+})();
+</script>
+{% endblock %}
