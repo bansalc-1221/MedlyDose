@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MedTlyDose · Never miss a dose</title>
+  <title>MedlyDose · Never miss a dose</title>
   <meta name="description" content="MedlyDose keeps your medicine schedule, reminds you when a dose is due, and keeps working even when parts of it break.">
   <script>
     try {
@@ -32,7 +32,6 @@
     <a class="brand-plain" href="/"><span class="mark"><svg class="ic"><use href="#i-pill"/></svg></span>MedlyDose</a>
     <div class="top-actions">
       <button class="icon-btn" data-theme-toggle aria-label="Switch light and dark theme"><svg class="ic"><use href="#i-contrast"/></svg></button>
-      <button class="btn" data-open="signin">Sign in</button>
     </div>
   </header>
 
@@ -42,8 +41,7 @@
         <h1>Never miss a dose.</h1>
         <p class="lede">MedlyDose keeps your medicine schedule, reminds you when each dose is due, and shares what you've taken with the person looking after you. If part of it breaks, it fixes itself.</p>
         <div class="hero-actions">
-          <button class="btn primary big" data-open="signup">Get started</button>
-          <button class="btn big" data-open="signin">Sign in</button>
+          <a class="btn primary big" href="/tracker">Get started</a>
         </div>
         <p class="fine">Your medicines stay on this computer.</p>
       </div>
@@ -89,7 +87,7 @@
       <div class="heals-copy">
         <h2>A missed dose can hurt someone, so MedlyDose watches itself.</h2>
         <p>Four protections run all the time. Break things on purpose from the Chaos page and watch each one recover, with the times written down.</p>
-        <button class="btn primary" data-open="signup">Create an account</button>
+        <a class="btn primary" href="/tracker">Get started</a>
       </div>
       <ul class="status-demo" aria-label="Parts of the system that are monitored">
         <li><span class="dot"></span>App</li>
@@ -103,26 +101,6 @@
 
   <footer class="foot">MedlyDose is a self-healing software project. The SMS and caregiver services in this version are simulated.</footer>
 </div>
-
-<dialog id="auth-dialog" aria-labelledby="auth-title">
-  <form id="auth-form" class="dlg" novalidate>
-    <div class="dlg-head">
-      <h2 id="auth-title">Create your account</h2>
-      <button type="button" class="icon-btn" data-close aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button>
-    </div>
-    <div class="tabs" role="tablist">
-      <button type="button" role="tab" id="tab-signup" data-tab="signup">Create account</button>
-      <button type="button" role="tab" id="tab-signin" data-tab="signin">Sign in</button>
-    </div>
-    <label class="field">Name<input id="a-name" autocomplete="username" placeholder="Your name"></label>
-    <label class="field">Password<input id="a-pass" type="password" autocomplete="current-password" placeholder="At least 6 characters"></label>
-    <p class="form-error" id="auth-error" role="alert"></p>
-    <div class="dlg-foot">
-      <button type="button" class="btn" data-close>Cancel</button>
-      <button class="btn primary" id="auth-submit">Create account</button>
-    </div>
-  </form>
-</dialog>
 
 <script src="{{ url_for('static', filename='hero.js') }}"></script>
 </body>

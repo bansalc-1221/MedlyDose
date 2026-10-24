@@ -1,4 +1,4 @@
-/* MedTracker landing page. Uses the app's palette tokens, so light and dark both work.
+/* MedlyDose landing page. Uses the app's palette tokens, so light and dark both work.
    The one bold idea is the blister pack: it is the product's own object, and it pops once as the page loads. */
 body.landing { background: var(--bg); color: var(--ink); }
 .wrap { max-width: 1180px; margin: 0 auto; padding: 0 clamp(18px, 4vw, 44px); }
