@@ -74,4 +74,10 @@ app/  main.py calendar_api.py db.py breaker.py sync.py quarantine.py  static/  t
 
 ## AI use
 
-This project was built with Claude (Anthropic) as a coding assistant. See the AI Use Declaration in the submission for what was asked of it and what the team wrote, changed and checked.
+This project was built along with the help of Claude (Anthropic) as a coding assistant.
+
+## License
+
+This project is licensed under the MIT License.
+
+Copyright (c) 2026 Chhavi Bansal
