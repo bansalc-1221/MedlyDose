@@ -86,7 +86,7 @@
       sel.value = names.includes(keep) ? keep : "";
       lastNames = namesKey;
     }
-    sel.hidden = names.length < 2;
+    sel.hidden = names.length < 1;
 
     const rows = sel.value ? historyRows.filter(r => r.name === sel.value) : historyRows;
     $("#history-empty").hidden = historyRows.length > 0;

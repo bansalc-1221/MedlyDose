@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Today{% endblock %}
+{% block title %}Tracker{% endblock %}
 
 {% block head %}
   <div>
-    <h1 id="greeting">Today</h1>
+    <h1>Tracker</h1>
     <p class="sub" id="datestr"></p>
   </div>
   <div class="head-actions">
@@ -33,19 +33,39 @@
     <p>Every dose has been taken. Your history is saved on the Medicines page.</p>
     <a class="btn" href="/medicines#taken">See what you've taken</a>
   </div>
+
+  <section class="panel cal" aria-label="Calendar">
+    <div class="cal-head">
+      <h2 class="section-title" id="cal-title"></h2>
+      <div class="cal-nav">
+        <button class="icon-btn" id="cal-prev" type="button" aria-label="Previous month"><svg class="ic"><use href="#i-chev-l"/></svg></button>
+        <button class="btn sm" id="cal-today" type="button">Today</button>
+        <button class="icon-btn" id="cal-next" type="button" aria-label="Next month"><svg class="ic"><use href="#i-chev-r"/></svg></button>
+      </div>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+    <div class="cal-key" aria-hidden="true">
+      <span><i style="background:var(--ok-dot)"></i>All taken</span>
+      <span><i style="background:var(--warn-dot)"></i>Some taken</span>
+      <span><i style="background:var(--bad-dot)"></i>Missed</span>
+      <span><i style="background:var(--muted);opacity:.55"></i>Still to come</span>
+    </div>
+    <div class="cal-day" id="cal-day"></div>
+  </section>
 {% endblock %}
 
 {% block scripts %}
 <script>
 (function () {
   const { $, esc, api, poll, toast } = MT;
-  const lastHtml = { doses: "", cells: "", count: "", notices: "" };
+  const lastHtml = { doses: "", cells: "", count: "", notices: "", calgrid: "", calday: "" };
   const seenDue = new Set();
   let firstLoad = true;
+  let lastProgress = null;
 
   const h = new Date().getHours();
-  $("#greeting").textContent = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
-  $("#datestr").textContent = new Date().toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" });
+  const hello = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+  $("#datestr").textContent = hello + ". It's " + new Date().toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" }) + ".";
 
   function setHtml(key, el, html) {
     if (lastHtml[key] !== html) { el.innerHTML = html; lastHtml[key] = html; }
@@ -141,7 +161,7 @@
     const waiting = d.doses.filter(x => x.state !== "scheduled");
     announce(waiting);
     firstLoad = false;
-    document.title = (waiting.length ? "(" + waiting.length + ") " : "") + "Today · MedTracker";
+    document.title = (waiting.length ? "(" + waiting.length + ") " : "") + "Tracker · MedlyDose";
 
     $("#empty").hidden = d.total > 0;
     $("#alldone").hidden = !(d.total > 0 && d.doses.length === 0);
@@ -161,7 +181,75 @@
       `<svg class="ic"><use href="#i-${x.taken ? "check" : "pill"}"/></svg></span>`).join(""));
 
     setHtml("doses", $("#doses"), d.doses.map(rowHtml).join(""));
+
+    const progress = d.done + "/" + d.total;     // a dose was taken, or a medicine added or removed: refresh the calendar
+    if (progress !== lastProgress) { lastProgress = progress; calRefresh(); }
   }
+
+  /* ---------- Calendar: every day, daily medicines included ---------- */
+  const pad = n => String(n).padStart(2, "0");
+  const ymd = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  const cal = { month: ymd(new Date()).slice(0, 7), selected: ymd(new Date()), data: null };
+  const STATUS = { taken: "Taken", missed: "Missed", due: "Due now", scheduled: "Scheduled" };
+
+  function monthLabel(ym) {
+    return new Date(+ym.slice(0, 4), +ym.slice(5, 7) - 1, 1).toLocaleDateString([], { month: "long", year: "numeric" });
+  }
+  function shiftMonth(delta) {
+    const d = new Date(+cal.month.slice(0, 4), +cal.month.slice(5, 7) - 1 + delta, 1);
+    cal.month = ymd(d).slice(0, 7);
+    calRefresh();
+  }
+
+  function drawGrid() {
+    const d = cal.data;
+    $("#cal-title").textContent = monthLabel(cal.month);
+    if (!d) return;
+    let html = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(w => `<div class="cal-wd">${w}</div>`).join("");
+    html += '<div class="cal-blank"></div>'.repeat(d.first_weekday);
+    for (let i = 1; i <= d.days_in_month; i++) {
+      const key = cal.month + "-" + pad(i), x = d.days[key] || { total: 0, taken: 0, missed: 0 };
+      let st = "";
+      if (x.total) st = x.missed ? "miss" : x.taken === x.total ? "all" : x.taken ? "part" : "todo";
+      const label = new Date(key + "T00:00:00").toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" }) +
+        (x.total ? ". " + x.taken + " of " + x.total + " taken" + (x.missed ? ", " + x.missed + " missed" : "") : ". No doses");
+      html += `<button type="button" class="cal-btn ${st} ${key === d.today ? "is-today" : ""} ${key === cal.selected ? "is-selected" : ""}" ` +
+        `data-date="${key}" aria-label="${esc(label)}" aria-pressed="${key === cal.selected}">` +
+        `<span class="cal-num">${i}</span><span class="cal-dot"></span><span class="cal-count">${x.total ? x.taken + "/" + x.total : ""}</span></button>`;
+    }
+    setHtml("calgrid", $("#cal-grid"), html);
+  }
+
+  function drawDay(r) {
+    const nice = new Date(r.date + "T00:00:00").toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" });
+    const rows = r.doses.map(x =>
+      `<li><span class="t">${esc(x.time)}</span><span class="n">${esc(x.name)} <small>· ${esc(x.dose)}${x.removed ? " · removed" : ""}</small></span>` +
+      `<span class="s ${x.status}">${STATUS[x.status]}${x.taken_at ? " at " + esc(x.taken_at.slice(11, 16)) : ""}</span></li>`).join("");
+    setHtml("calday", $("#cal-day"), `<h3>${esc(nice)}${r.date === r.today ? " (today)" : ""}</h3>` +
+      (rows ? `<ul class="cal-list">${rows}</ul>` : '<p class="cal-empty">No doses on this day.</p>'));
+  }
+
+  async function calRefresh() {
+    try {
+      cal.data = await api("/api/calendar?month=" + cal.month);
+      drawGrid();
+      drawDay(await api("/api/calendar/day?date=" + cal.selected));
+    } catch (e) { /* the connection light already says so */ }
+  }
+
+  $("#cal-prev").addEventListener("click", () => shiftMonth(-1));
+  $("#cal-next").addEventListener("click", () => shiftMonth(1));
+  $("#cal-today").addEventListener("click", () => {
+    cal.selected = ymd(new Date()); cal.month = cal.selected.slice(0, 7); calRefresh();
+  });
+  $("#cal-grid").addEventListener("click", e => {
+    const b = e.target.closest("[data-date]");
+    if (!b) return;
+    cal.selected = b.dataset.date;
+    drawGrid();
+    api("/api/calendar/day?date=" + cal.selected).then(drawDay).catch(() => {});
+  });
+  setInterval(calRefresh, 30000);      // a new day, or a change from another tab
 
   const load = poll(async () => { render(await api("/api/today")); }, 3000);
   window.addEventListener("meds-changed", load);
