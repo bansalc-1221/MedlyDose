@@ -4,6 +4,8 @@ MedTracker helps a person (or a caregiver looking after them) take the right med
 
 A missed or doubled dose can hurt someone, so MedTracker must keep working when things break. It notices failures by itself, works out what went wrong, and recovers with no human restarting anything.
 
+Scenario: our own (option E in the brief), a daily-life, high-stakes health app.
+
 ## Run it
 
 Python 3.10 or newer. In PowerShell, from the project folder:
@@ -22,9 +24,7 @@ python mock_sms\server.py       # pretend SMS service (port 5001)
 python mock_cloud\server.py     # pretend caregiver cloud (port 5002)
 ```
 
-Open http://localhost:5000. You see a welcome page first; create an account or sign in and the Tracker opens on the same address. Pages: Tracker, Medicines, Health (live dashboard), Watchdog, Chaos. Caregiver view: http://localhost:5002/doses
-
-Accounts are a sign-in gate for this computer. All accounts see the same medicines, because MedTracker keeps one shared database. Passwords are stored hashed, but this is a local demo, not a production login.
+Open http://localhost:5000. You see a welcome page first; press Get started and the Tracker opens. Pages: Tracker, Medicines, Health (live dashboard), Watchdog, Chaos. Caregiver view: http://localhost:5002/doses
 
 ## The self-healing mechanisms
 
@@ -51,7 +51,7 @@ python chaos.py healing off         # switch self-healing off (and "on" to bring
 
 Results are saved to `chaos_results.md` and `chaos_results.json`. The script puts your own data back after the wipe test.
 
-The "Self-healing" switch on the Chaos page turns every mechanism off so the same failure can be shown without protection. With it on, an SMS or internet outage ends by itself after 10 to 12 seconds. With it off, the outage stays until `python chaos.py restore`, or until you switch self-healing back on (it then reconnects the services by itself).
+The "Self-healing" switch on the Chaos page turns every mechanism off so the same failure can be shown without protection. With it on, the app reconnects a downed SMS or cloud service automatically after about 8 to 10 seconds. With it off, the outage stays until `python chaos.py restore`, or until you switch self-healing back on (it then reconnects the services by itself).
 
 ## Results
 
@@ -69,9 +69,9 @@ Run `python chaos.py` on your own machine and paste the table from `chaos_result
 ```
 watchdog.py, chaos.py, show_incidents.py
 mock_sms/server.py, mock_cloud/server.py
-app/  main.py auth.py calendar_api.py db.py breaker.py sync.py quarantine.py  static/  templates/
+app/  main.py calendar_api.py db.py breaker.py sync.py quarantine.py  static/  templates/
 ```
 
-## License
+## AI use
 
-Released under the [MIT License](LICENSE). Copyright (c) 2026 CHHAVI BANSAL.
+This project was built with Claude (Anthropic) as a coding assistant. See the AI Use Declaration in the submission for what was asked of it and what the team wrote, changed and checked.
