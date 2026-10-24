@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MedTlyDose · Never miss a dose</title>
+  <meta name="description" content="MedlyDose keeps your medicine schedule, reminds you when a dose is due, and keeps working even when parts of it break.">
+  <script>
+    try {
+      var t = localStorage.getItem("mt-theme");
+      if (!t && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches) t = "dark";
+      if (t) document.documentElement.setAttribute("data-theme", t);
+    } catch (e) {}
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='hero.css') }}">
+</head>
+<body class="landing">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-pill" viewBox="0 0 24 24"><rect x="3" y="8.5" width="18" height="7" rx="3.5" transform="rotate(-35 12 12)"/><path d="M9.2 7.4l7.4 9.2" /></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 1112 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 004 0"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><path d="M2.5 19c.6-3 2.8-4.5 5.5-4.5s4.9 1.5 5.5 4.5"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14.2c2.6-.2 4.8 1.2 5.5 4.3"/></symbol>
+  <symbol id="i-pulse" viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></symbol>
+  <symbol id="i-contrast" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 000-17z" fill="currentColor"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+</svg>
+
+<div class="wrap">
+  <header class="top">
+    <a class="brand-plain" href="/"><span class="mark"><svg class="ic"><use href="#i-pill"/></svg></span>MedlyDose</a>
+    <div class="top-actions">
+      <button class="icon-btn" data-theme-toggle aria-label="Switch light and dark theme"><svg class="ic"><use href="#i-contrast"/></svg></button>
+      <button class="btn" data-open="signin">Sign in</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <h1>Never miss a dose.</h1>
+        <p class="lede">MedlyDose keeps your medicine schedule, reminds you when each dose is due, and shares what you've taken with the person looking after you. If part of it breaks, it fixes itself.</p>
+        <div class="hero-actions">
+          <button class="btn primary big" data-open="signup">Get started</button>
+          <button class="btn big" data-open="signin">Sign in</button>
+        </div>
+        <p class="fine">Your medicines stay on this computer.</p>
+      </div>
+
+      <div class="art" aria-hidden="true">
+        <div class="pack" id="pack">
+          <span class="cell"><svg class="ic g-pill"><use href="#i-pill"/></svg><svg class="ic g-check"><use href="#i-check"/></svg></span>
+          <span class="cell"><svg class="ic g-pill"><use href="#i-pill"/></svg><svg class="ic g-check"><use href="#i-check"/></svg></span>
+          <span class="cell"><svg class="ic g-pill"><use href="#i-pill"/></svg><svg class="ic g-check"><use href="#i-check"/></svg></span>
+          <span class="cell"><svg class="ic g-pill"><use href="#i-pill"/></svg><svg class="ic g-check"><use href="#i-check"/></svg></span>
+          <span class="cell"><svg class="ic g-pill"><use href="#i-pill"/></svg><svg class="ic g-check"><use href="#i-check"/></svg></span>
+          <span class="cell"><svg class="ic g-pill"><use href="#i-pill"/></svg><svg class="ic g-check"><use href="#i-check"/></svg></span>
+          <span class="cell"><svg class="ic g-pill"><use href="#i-pill"/></svg><svg class="ic g-check"><use href="#i-check"/></svg></span>
+          <span class="cell"><svg class="ic g-pill"><use href="#i-pill"/></svg><svg class="ic g-check"><use href="#i-check"/></svg></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="does" aria-label="What MedlyDose does">
+      <div class="does-item">
+        <svg class="ic"><use href="#i-bell"/></svg>
+        <h2>Reminders that arrive on time</h2>
+        <p>Set a bell before a dose is due. When the time comes you get an alert and a text message, and the Taken button appears.</p>
+      </div>
+      <div class="does-item">
+        <svg class="ic"><use href="#i-calendar"/></svg>
+        <h2>A calendar of every day</h2>
+        <p>See what you took, what you missed and what's still to come, one day at a time.</p>
+      </div>
+      <div class="does-item">
+        <svg class="ic"><use href="#i-share"/></svg>
+        <h2>Shared with your caregiver</h2>
+        <p>Each dose you take is passed on. If the internet drops, it's saved on this device and sent when it's back.</p>
+      </div>
+      <div class="does-item">
+        <svg class="ic"><use href="#i-pulse"/></svg>
+        <h2>Fixes itself when it breaks</h2>
+        <p>If the app crashes, freezes or a service stops answering, it notices and recovers without anyone restarting it.</p>
+      </div>
+    </section>
+
+    <section class="heals">
+      <div class="heals-copy">
+        <h2>A missed dose can hurt someone, so MedlyDose watches itself.</h2>
+        <p>Four protections run all the time. Break things on purpose from the Chaos page and watch each one recover, with the times written down.</p>
+        <button class="btn primary" data-open="signup">Create an account</button>
+      </div>
+      <ul class="status-demo" aria-label="Parts of the system that are monitored">
+        <li><span class="dot"></span>App</li>
+        <li><span class="dot"></span>Watchdog</li>
+        <li><span class="dot"></span>SMS service</li>
+        <li><span class="dot"></span>Cloud sync</li>
+        <li><span class="dot"></span>Database</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="foot">MedlyDose is a self-healing software project. The SMS and caregiver services in this version are simulated.</footer>
+</div>
+
+<dialog id="auth-dialog" aria-labelledby="auth-title">
+  <form id="auth-form" class="dlg" novalidate>
+    <div class="dlg-head">
+      <h2 id="auth-title">Create your account</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" id="tab-signup" data-tab="signup">Create account</button>
+      <button type="button" role="tab" id="tab-signin" data-tab="signin">Sign in</button>
+    </div>
+    <label class="field">Name<input id="a-name" autocomplete="username" placeholder="Your name"></label>
+    <label class="field">Password<input id="a-pass" type="password" autocomplete="current-password" placeholder="At least 6 characters"></label>
+    <p class="form-error" id="auth-error" role="alert"></p>
+    <div class="dlg-foot">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button class="btn primary" id="auth-submit">Create account</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="{{ url_for('static', filename='hero.js') }}"></script>
+</body>
+</html>

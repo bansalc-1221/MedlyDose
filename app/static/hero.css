@@ -1,0 +1,81 @@
+/* MedTracker landing page. Uses the app's palette tokens, so light and dark both work.
+   The one bold idea is the blister pack: it is the product's own object, and it pops once as the page loads. */
+body.landing { background: var(--bg); color: var(--ink); }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 clamp(18px, 4vw, 44px); }
+
+.top { display: flex; justify-content: space-between; align-items: center; padding: 22px 0; }
+.brand-plain { display: flex; align-items: center; gap: 10px; color: var(--ink-strong); text-decoration: none;
+               font-weight: 750; font-size: 17px; letter-spacing: -0.01em; }
+.brand-plain .mark { width: 32px; height: 32px; border-radius: 10px; background: var(--accent); color: var(--on-accent);
+                     display: grid; place-items: center; }
+.brand-plain .mark .ic { width: 18px; height: 18px; }
+.top-actions { display: flex; gap: 10px; align-items: center; }
+
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(28px, 6vw, 84px);
+        align-items: center; padding: clamp(28px, 6vw, 76px) 0 clamp(40px, 7vw, 90px); }
+.hero h1 { font-size: clamp(46px, 7.4vw, 92px); line-height: 1; letter-spacing: -0.04em; font-weight: 780;
+           color: var(--ink-strong); }
+.lede { margin-top: 22px; font-size: clamp(17px, 1.6vw, 20px); line-height: 1.55; color: var(--muted); max-width: 46ch; }
+.hero-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 30px; }
+.btn.big { padding: 14px 24px; font-size: 16px; border-radius: 12px; }
+.fine { margin-top: 16px; font-size: 14px; color: var(--muted); }
+
+/* the blister pack */
+.art { background: var(--accent); border-radius: 30px; aspect-ratio: 5 / 4.4; display: grid; place-items: center;
+       overflow: hidden; position: relative; }
+.pack { width: 80%; transform: rotate(-7deg); display: grid; grid-template-columns: repeat(4, 1fr); gap: 5%;
+        padding: 7% 6%; background: var(--foil); border: 1px solid var(--foil-edge); border-radius: 22px;
+        box-shadow: 0 30px 60px rgba(0, 0, 0, .35); }
+.pack .cell { aspect-ratio: 1; border-radius: 50%; background: var(--cell); box-shadow: var(--cell-shadow);
+              display: grid; place-items: center; cursor: pointer; color: #6c7488;
+              transition: transform .28s cubic-bezier(.3, 1.6, .5, 1), background .2s, box-shadow .2s; }
+.pack .cell .ic { grid-area: 1 / 1; width: 46%; height: 46%; transition: opacity .2s; }
+.pack .cell .g-check { opacity: 0; color: #3e4c72; stroke-width: 2.6; }
+.pack .cell.popped { background: var(--crater); box-shadow: var(--crater-shadow); transform: scale(.9); }
+.pack .cell.popped .g-pill { opacity: 0; }
+.pack .cell.popped .g-check { opacity: 1; }
+
+/* what it does: four items divided by hairlines, not four identical cards */
+.does { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); }
+.does-item { padding: 30px 26px 34px 0; }
+.does-item + .does-item { padding-left: 26px; border-left: 1px solid var(--line); }
+.does-item .ic { width: 26px; height: 26px; color: var(--accent-text); }
+.does-item h2 { margin-top: 16px; font-size: 18px; line-height: 1.25; letter-spacing: -0.01em; color: var(--ink-strong); }
+.does-item p { margin-top: 8px; color: var(--muted); font-size: 15px; line-height: 1.55; }
+
+.heals { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: clamp(24px, 5vw, 64px);
+         align-items: center; margin: clamp(36px, 6vw, 72px) 0; padding: clamp(26px, 4vw, 48px);
+         background: var(--surface); border: 1px solid var(--line); border-radius: 24px; }
+.heals h2 { font-size: clamp(24px, 3vw, 34px); line-height: 1.15; letter-spacing: -0.025em; color: var(--ink-strong); max-width: 20ch; }
+.heals p { margin: 14px 0 22px; color: var(--muted); line-height: 1.55; max-width: 48ch; }
+.status-demo { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; margin: 0; padding: 0; }
+.status-demo li { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line-soft);
+                  font-weight: 650; color: var(--ink); }
+.status-demo .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ok-dot); }
+
+.foot { padding: 12px 0 44px; color: var(--muted); font-size: 13.5px; max-width: 70ch; }
+
+/* sign-in dialog */
+.tabs { display: flex; gap: 4px; padding: 4px; background: var(--surface-2); border-radius: 12px; }
+.tabs button { flex: 1; padding: 9px 12px; border: 0; border-radius: 9px; background: none; color: var(--muted);
+               font: inherit; font-weight: 650; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink-strong); box-shadow: 0 1px 3px rgba(0, 0, 0, .18); }
+#auth-dialog { width: min(420px, calc(100vw - 32px)); }
+
+@media (max-width: 900px) {
+  .hero { grid-template-columns: 1fr; }
+  .art { aspect-ratio: 5 / 4; }
+  .does { grid-template-columns: 1fr 1fr; }
+  .does-item, .does-item + .does-item { padding: 26px 20px 28px 0; border-left: 0; border-top: 1px solid var(--line); }
+  .does-item:nth-child(-n+2) { border-top: 0; }
+  .does-item:nth-child(even) { padding-left: 20px; border-left: 1px solid var(--line); }
+  .heals { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .does { grid-template-columns: 1fr; }
+  .does-item, .does-item:nth-child(even) { padding: 22px 0; border-left: 0; border-top: 1px solid var(--line); }
+  .does-item:first-child { border-top: 0; }
+  .btn.big { flex: 1 1 100%; }
+  .status-demo { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { .pack .cell { transition: none; } }
