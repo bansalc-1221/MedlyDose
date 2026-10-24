@@ -12,11 +12,12 @@ Start MedTracker first (three terminals, each with the venv on):
 Then, in a fourth terminal:
     python chaos.py                       run every failure 3 times with self-healing ON, once OFF, print the table
     python chaos.py run --runs 1          a quicker run
-    python chaos.py run --only crash,flood
+    python chaos.py run --only crash,sms
     python chaos.py run --skip-off        skip the "without self-healing" comparison
-    python chaos.py inject crash          just break one thing (crash, freeze, sms, cloud, corrupt, flood, wipe)
+    python chaos.py inject crash          just break one thing (crash, freeze, sms, cloud, corrupt, wipe)
     python chaos.py healing on            switch self-healing back on (needed if you crashed the app while it was off)
     python chaos.py healing off
+    python chaos.py restore               bring the SMS and cloud services back after breaking them with healing off
 
 Times are measured from the moment the failure is injected:
     detected   = until the system notices
@@ -26,7 +27,6 @@ import argparse
 import json
 import statistics
 import sys
-import threading
 import time
 from datetime import datetime
 from pathlib import Path
@@ -44,24 +44,28 @@ SMS = "http://127.0.0.1:5001"
 RECOVERY_LIMIT = 30     # the brief's target: recover within 30 seconds, no human help
 OFF_WAIT = 20           # how long we watch a failure that nothing is healing
 
-SCENARIOS = ["crash", "freeze", "sms", "cloud", "corrupt", "flood", "wipe"]
+SCENARIOS = ["crash", "freeze", "sms", "cloud", "corrupt", "wipe"]
 DETECTED_BY = {
     "crash": "Watchdog sees the process has exited",
     "freeze": "Watchdog: 3 failed health checks in a row",
     "sms": "Circuit breaker: 3 failed checks of the SMS service",
     "cloud": "Sync loop pings the cloud every 3 s",
     "corrupt": "Quarantine scan every 3 s validates every record",
-    "flood": "Rate limiter sees one client over its limit",
     "wipe": "Integrity check: healthy medicines suddenly missing",
 }
 LABEL = {
-    "crash": "App crashes", "freeze": "App freezes", "sms": "SMS service outage (12 s)",
-    "cloud": "Internet to cloud drops (8 s)", "corrupt": "Corrupted record in database",
-    "flood": "Traffic flood (8 s)", "wipe": "All data wiped",
+    "crash": "App crashes", "freeze": "App freezes", "sms": "SMS service outage",
+    "cloud": "Internet to cloud drops", "corrupt": "Corrupted record in database",
+    "wipe": "All data wiped",
 }
 
 
 # ---------------------------------------------------------------- helpers
+
+def auth():
+    """The app asks people to sign in. This script proves who it is with a secret key stored in the database."""
+    return {"X-Chaos-Key": db.get_setting("chaos_key", "")}
+
 
 def say(text=""):
     print(text, flush=True)
@@ -69,14 +73,14 @@ def say(text=""):
 
 def post(path, **kw):
     try:
-        return requests.post(APP + path, timeout=kw.pop("timeout", 4), **kw)
+        return requests.post(APP + path, timeout=kw.pop("timeout", 4), headers=auth(), **kw)
     except Exception:
         return None
 
 
 def get_json(url, timeout=3):
     try:
-        return requests.get(url, timeout=timeout).json()
+        return requests.get(url, timeout=timeout, headers=auth()).json()
     except Exception:
         return None
 
@@ -250,11 +254,12 @@ def s_cloud(heal):
     time.sleep(max(0, 4 - (time.time() - t0)))
     post("/api/take", json={"medicine_id": info.get("medicine_id"), "time": info.get("time")})
     time.sleep(max(0, 8 - (time.time() - t0)))
-    requests.get(CLOUD + "/admin/up", timeout=2)
+    if not heal:
+        requests.get(CLOUD + "/admin/up", timeout=2)     # with healing off, a human has to fix it
     restored = time.time() - t0
     key = f"{datetime.now().strftime('%Y-%m-%d')} {info.get('time')}: Chaos test"
     recovered = None
-    limit = restored + (15 if heal else 14)
+    limit = restored + (22 if heal else 14)
     while time.time() - t0 < limit:
         try:
             if key in requests.get(CLOUD + "/doses", timeout=2).text:
@@ -301,70 +306,6 @@ def s_corrupt(heal):
     return result("corrupt", "without", None, None, "Bad record stays in the database, mixed with real data")
 
 
-def flood(seconds, workers=60, probe=True):
-    """One noisy client hammers the app. A normal client keeps using it. Returns what each side experienced."""
-    stop = time.time() + seconds
-    stats = {"sent": 0, "refused": 0, "first_refused": None, "flood_errors": 0}
-    probe_log = []
-    lock = threading.Lock()
-    t0 = time.time()
-
-    def hammer():
-        s = requests.Session()
-        s.headers["X-Client-Id"] = "chaos-flood"
-        while time.time() < stop:
-            try:
-                r = s.get(APP + "/api/status", timeout=3)
-                with lock:
-                    stats["sent"] += 1
-                    if r.status_code == 429:
-                        stats["refused"] += 1
-                        if stats["first_refused"] is None:
-                            stats["first_refused"] = time.time() - t0
-            except Exception:
-                with lock:
-                    stats["flood_errors"] += 1
-
-    def normal_user():
-        s = requests.Session()
-        while time.time() < stop:
-            a = time.time()
-            try:
-                code = s.get(APP + "/api/today", timeout=3).status_code
-            except Exception:
-                code = 0
-            probe_log.append((code, time.time() - a))
-            time.sleep(0.1)
-
-    threads = [threading.Thread(target=hammer, daemon=True) for _ in range(workers)]
-    if probe:
-        threads.append(threading.Thread(target=normal_user, daemon=True))
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
-    stats["probe"] = probe_log
-    return stats
-
-
-def s_flood(heal):
-    set_healing(heal)
-    db.mark_chaos("traffic")      # (the Chaos page button starts this same flood from inside the app)
-    st = flood(8)
-    log = st["probe"]
-    ok = [l for c, l in log if c == 200]
-    lat = sorted(l for c, l in log)
-    p95 = lat[int(len(lat) * 0.95) - 1] if lat else None
-    success = 100.0 * len(ok) / len(log) if log else 0
-    note = (f"Normal user: {success:.0f}% of requests answered, slowest {max(lat):.2f} s, "
-            f"95th percentile {p95:.2f} s. Flood: {st['refused']} of {st['sent']} requests refused") if lat else "no data"
-    time.sleep(3.5)   # let the incident close
-    if heal:
-        return result("flood", "with", st["first_refused"], 0.0, note)
-    set_healing(True)
-    return result("flood", "without", None, None, note)
-
-
 def s_wipe(heal):
     set_healing(True)
     # Safety net: keep a copy of your real data, because this really deletes it
@@ -402,7 +343,7 @@ def s_wipe(heal):
 
 
 RUNNERS = {"crash": s_crash, "freeze": s_freeze, "sms": s_sms, "cloud": s_cloud,
-           "corrupt": s_corrupt, "flood": s_flood, "wipe": s_wipe}
+           "corrupt": s_corrupt, "wipe": s_wipe}
 
 
 # ---------------------------------------------------------------- reporting
@@ -500,8 +441,7 @@ def main():
     i.add_argument("name", choices=SCENARIOS)
     h = sub.add_parser("healing", help="switch self-healing on or off")
     h.add_argument("state", choices=["on", "off"])
-    f = sub.add_parser("flood", help="flood the app with requests")
-    f.add_argument("--seconds", type=int, default=8)
+    sub.add_parser("restore", help="bring the SMS and cloud services back (use after breaking them with self-healing off)")
     args = p.parse_args()
 
     if args.cmd in (None, "run"):
@@ -512,11 +452,14 @@ def main():
         return inject(args)
     if args.cmd == "healing":
         return healing(args)
-    if args.cmd == "flood":
-        st = flood(args.seconds, probe=False)
-        say(f"Flood finished: {st['sent']} requests sent, {st['refused']} refused.")
+    if args.cmd == "restore":
+        for name, url in (("SMS service", SMS), ("Caregiver cloud connection", CLOUD)):
+            try:
+                requests.get(url + "/admin/up", timeout=2)
+                say(f"{name}: back up.")
+            except Exception:
+                say(f"{name}: could not be reached. Is it running?")
         return 0
-
 
 if __name__ == "__main__":
     sys.exit(main() or 0)

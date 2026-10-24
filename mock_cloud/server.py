@@ -1,3 +1,5 @@
+import threading
+
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
@@ -35,7 +37,14 @@ def health():
 # Chaos switches
 @app.route("/admin/down")
 def go_down():
+    """/admin/down stays down until /admin/up. /admin/down?seconds=10 comes back by itself, like a real outage."""
     state["up"] = False
+    secs = request.args.get("seconds", type=float)
+    if secs:
+        t = threading.Timer(secs, lambda: state.update(up=True))
+        t.daemon = True
+        t.start()
+        return f"Cloud connection is DOWN for {secs:g} seconds"
     return "Cloud connection is now DOWN"
 
 

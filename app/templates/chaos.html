@@ -21,36 +21,28 @@
 
   <div class="chaos-grid">
     <div class="panel chaos-card">
-      <div><h3>Crash the app</h3><p>Kills the app process instantly. Tests the watchdog restart.</p></div>
+      <div><h3>Crash the app</h3><p>Kills the app process instantly, like a program crashing or running out of memory. The page goes offline for a moment. The watchdog, a separate program that checks the app every 2 seconds, sees that it has stopped and starts it again within a few seconds. Nothing you saved is lost.</p></div>
       <div class="row"><button class="btn danger" data-action="crash" data-needs-healing><svg class="ic"><use href="#i-bolt"/></svg>Crash app</button></div>
     </div>
 
     <div class="panel chaos-card">
-      <div><h3>Freeze the app</h3><p>The app stays alive but stops answering. Tests how the watchdog spots a frozen app.</p></div>
+      <div><h3>Freeze the app</h3><p>The app stays running but stops answering, like a program stuck in an endless loop. This is harder to spot than a crash because the process is still alive. The watchdog asks the app if it is well every 2 seconds. After 3 unanswered checks in a row it stops the frozen app and starts a fresh one, in about 8 to 12 seconds.</p></div>
       <div class="row"><button class="btn danger" data-action="freeze" data-needs-healing><svg class="ic"><use href="#i-bolt"/></svg>Freeze app</button></div>
     </div>
 
     <div class="panel chaos-card">
-      <div><h3>SMS service</h3><p>Takes the reminder service offline for 12 seconds. It comes back by itself, like a real outage. Tests the circuit breaker: it stops calling the dead service, then tests it again and resumes.</p></div>
-      <div class="row"><button class="btn danger" data-action="sms_down">Take down for 12 s</button></div>
+      <div><h3>SMS service</h3><p>Takes the reminder service offline. With self-healing on, the circuit breaker stops calling it and the app reconnects it automatically after about 10 seconds. With self-healing off it stays down until you run <code>python chaos.py restore</code>, or switch self-healing back on.</p></div>
+      <div class="row"><button class="btn danger" data-action="sms_down" data-warn-off="With self-healing off, the SMS service stays down until you run python chaos.py restore in a terminal, or switch self-healing back on.">Take down</button></div>
     </div>
 
     <div class="panel chaos-card">
-      <div><h3>Internet connection</h3><p>Cuts the link to the caregiver cloud. Tests the offline queue. Take a dose on Today while it's cut, then restore it.</p></div>
-      <div class="row">
-        <button class="btn danger" data-action="cloud_down">Cut connection</button>
-        <button class="btn good" data-action="cloud_up">Restore</button>
-      </div>
+      <div><h3>Internet connection</h3><p>Cuts the link to the caregiver cloud. Take a dose on the Tracker page while it's cut. With self-healing on, doses are saved on this device and the app reconnects the link automatically after about 8 seconds. With self-healing off, doses are lost and the link stays cut until <code>python chaos.py restore</code> or until self-healing is switched back on.</p></div>
+      <div class="row"><button class="btn danger" data-action="cloud_down" data-warn-off="With self-healing off, the connection stays cut and doses are lost until you run python chaos.py restore in a terminal, or switch self-healing back on.">Cut connection</button></div>
     </div>
 
     <div class="panel chaos-card">
       <div><h3>Corrupt the database</h3><p>Slips one deliberately broken record (blank name, dose -5, time 25:99) into the database, like bad data from a faulty import. It is never a real medicine and is never shown in your list. The app finds it within about 3 seconds and sets it aside in quarantine. Watch the Health page.</p></div>
       <div class="row"><button class="btn danger" data-action="corrupt"><svg class="ic"><use href="#i-bolt"/></svg>Corrupt record</button></div>
-    </div>
-
-    <div class="panel chaos-card">
-      <div><h3>Flood the app</h3><p>One client sends hundreds of requests a second for 8 seconds, like results-day traffic. Tests load shedding: the flood is refused, everyone else is served normally.</p></div>
-      <div class="row"><button class="btn danger" data-action="flood"><svg class="ic"><use href="#i-bolt"/></svg>Flood app</button></div>
     </div>
 
     <div class="panel chaos-card cant-heal">
@@ -89,7 +81,7 @@
     $("#heal-panel").classList.toggle("is-off", !on);
     $("#heal-text").textContent = on
       ? "Switch it off to see what happens to the same failures without protection. Use it for the before and after comparison."
-      : "Nothing is watching or repairing right now. Failures will stay broken. If the app is crashed or frozen, run  python chaos.py healing on  in a terminal to bring it back.";
+      : "Nothing is watching or repairing right now. Failures stay broken. Switch self-healing back on here and the SMS and cloud connections return by themselves. A crashed or frozen app needs  python chaos.py healing on  in a terminal.";
   }
   showHealing(true);
   $("#heal-btn").addEventListener("click", async () => {
@@ -104,6 +96,10 @@
     const label = b.textContent.trim();
     if (b.dataset.confirm) {
       const ok = await confirmBox({ title: "Wipe all data?", text: b.dataset.confirm, confirm: "Wipe it" });
+      if (!ok) return;
+    }
+    if (!healing && b.dataset.warnOff) {
+      const ok = await confirmBox({ title: "Self-healing is off", text: b.dataset.warnOff, confirm: "Break it anyway" });
       if (!ok) return;
     }
     if (!healing && b.hasAttribute("data-needs-healing")) {
