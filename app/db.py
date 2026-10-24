@@ -69,6 +69,12 @@ def init_db():
         reason TEXT NOT NULL,
         quarantined_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        pw_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
@@ -98,12 +104,23 @@ def init_db():
     if "fired_at" not in rcols:
         conn.execute("ALTER TABLE reminders ADD COLUMN fired_at TEXT")
         conn.execute("UPDATE reminders SET fired_at = created_at WHERE fired_at IS NULL")
+    # The calendar needs to know the day each medicine was added, so earlier days are not shown as "missed".
+    mcols = {r["name"] for r in conn.execute("PRAGMA table_info(medicines)")}
+    if "created_day" not in mcols:
+        conn.execute("ALTER TABLE medicines ADD COLUMN created_day TEXT")
+    conn.execute(
+        "UPDATE medicines SET created_day = COALESCE("
+        "(SELECT MIN(day) FROM dose_log WHERE dose_log.medicine_id = medicines.id), date('now', 'localtime')) "
+        "WHERE created_day IS NULL"
+    )
     conn.execute(
         "UPDATE dose_log SET "
         "name = (SELECT name FROM medicines WHERE medicines.id = dose_log.medicine_id), "
         "dose = (SELECT dose FROM medicines WHERE medicines.id = dose_log.medicine_id) "
         "WHERE name IS NULL"
     )
+    conn.execute("DELETE FROM incidents WHERE component = 'traffic'")     # the flood test was removed
+    conn.execute("DELETE FROM chaos_marks WHERE component = 'traffic'")
     conn.commit()
     conn.close()
 

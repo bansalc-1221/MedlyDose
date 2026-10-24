@@ -1,36 +1,52 @@
 import os
-import subprocess
-import sys
 import time
 import threading
 from datetime import datetime
-from pathlib import Path
 
 import requests
 from flask import Flask, render_template, request
 
+import calendar_api
 import quarantine
-import ratelimit
 import sync
 from breaker import CircuitBreaker
 from db import (get_db, init_db, close_orphan_incidents, healing_on, set_healing,
                 get_setting, set_setting, mark_chaos)
 
-ROOT = Path(__file__).parent.parent
-
 app = Flask(__name__)
+app.register_blueprint(calendar_api.bp)
 
 SMS_URL = "http://127.0.0.1:5001/send"
 SMS_HEALTH_URL = "http://127.0.0.1:5001/health"
 sms_breaker = CircuitBreaker("sms_service", failure_threshold=3, cooldown=10)
 
 chaos_state = {"freeze_until": 0}
+SERVICES = {   # the two helper services MedTracker depends on (simulated stand-ins)
+    "sms_service": {"name": "SMS service", "health": "http://127.0.0.1:5001/health", "up": "http://127.0.0.1:5001/admin/up"},
+    "cloud_sync": {"name": "Caregiver cloud connection", "health": "http://127.0.0.1:5002/health", "up": "http://127.0.0.1:5002/admin/up"},
+}
 CHAOS_LINKS = {
-    "sms_down": "http://127.0.0.1:5001/admin/down?seconds=12",   # the outage ends by itself after 12 s
+    "sms_down": "http://127.0.0.1:5001/admin/down",
     "sms_up": "http://127.0.0.1:5001/admin/up",
     "cloud_down": "http://127.0.0.1:5002/admin/down",
     "cloud_up": "http://127.0.0.1:5002/admin/up",
 }
+HEAL_AFTER = {"sms_service": 10, "cloud_sync": 8}   # with self-healing on, a service that stays down is reconnected after this many seconds
+
+_svc_cache = {}
+
+
+def service_up(url, fresh=False):
+    """Is a helper service answering? The answer is remembered for a second so busy pages don't flood it."""
+    hit = _svc_cache.get(url)
+    if hit and not fresh and time.time() - hit[0] < 1:
+        return hit[1]
+    try:
+        ok = requests.get(url, timeout=0.8).status_code == 200
+    except Exception:
+        ok = False
+    _svc_cache[url] = (time.time(), ok)
+    return ok
 
 
 # ---------- "Freeze" simulation ----------
@@ -45,23 +61,15 @@ def freeze_gate():
         time.sleep(0.2)
 
 
-@app.before_request
-def shed_load():
-    """Traffic protection: one client sending far too many requests gets refused (429); everyone else is unaffected."""
-    if request.path.startswith("/static") or request.path == "/health":
-        return
-    if not healing_on():
-        ratelimit.allow("__counting__")   # still counted for the dashboard, but nobody is refused
-        return
-    key = request.headers.get("X-Client-Id") or request.remote_addr
-    if not ratelimit.allow(key):
-        return {"ok": False, "message": "Too many requests. Slow down."}, 429, {"Retry-After": "1"}
-
-
 # ---------- Pages (each one is a shell; the data arrives through /api) ----------
 
 @app.route("/")
 def home():
+    return render_template("hero.html")          # the welcome page; its Get started button opens the Tracker
+
+
+@app.route("/tracker")
+def tracker():
     return render_template("index.html")
 
 
@@ -224,6 +232,27 @@ def api_medicines():
     return {"medicines": out}
 
 
+@app.route("/api/history")
+def api_history():
+    """Every dose that was ticked off, newest first. Doses of medicines that were removed stay here."""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT d.*, m.id AS still_there FROM dose_log d LEFT JOIN medicines m ON m.id = d.medicine_id "
+        "ORDER BY d.day DESC, d.taken_at DESC LIMIT 500").fetchall()
+    conn.close()
+    out = []
+    for r in rows:
+        delay = None
+        try:
+            due = datetime.fromisoformat(f"{r['day']}T{r['time']}:00")
+            delay = max(0, int((datetime.fromisoformat(r["taken_at"]) - due).total_seconds() // 60))
+        except (TypeError, ValueError):
+            pass
+        out.append({"name": r["name"] or "Removed medicine", "dose": r["dose"] or "", "day": r["day"],
+                    "time": r["time"], "taken_at": r["taken_at"], "delay": delay, "removed": r["still_there"] is None})
+    return {"history": out}
+
+
 @app.route("/api/medicines", methods=["POST"])
 def api_add_medicine():
     data = request.get_json(silent=True) or {}
@@ -241,8 +270,8 @@ def api_add_medicine():
 
     conn = get_db()
     conn.execute(
-        "INSERT INTO medicines (name, dose, times) VALUES (?, ?, ?)",
-        (name, dose, times_text),
+        "INSERT INTO medicines (name, dose, times, created_day) VALUES (?, ?, ?, ?)",
+        (name, dose, times_text, datetime.now().strftime("%Y-%m-%d")),
     )
     conn.commit()
     conn.close()
@@ -397,11 +426,42 @@ def enrich(rows):
     return out
 
 
+heal_watch = {"was_on": True}
+
+
+def heal_services():
+    """Self-healing has just been switched on: reconnect any helper service that was left down while it was off."""
+    for comp, svc in SERVICES.items():
+        if service_up(svc["health"], fresh=True):
+            continue
+        detected = datetime.now()
+        try:
+            requests.get(svc["up"], timeout=2)
+        except Exception:
+            continue
+        done = datetime.now()
+        conn = get_db()
+        conn.execute(
+            "INSERT INTO incidents (component, detected_at, diagnosis, action, recovered_at, recovery_seconds) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (comp, detected.isoformat(timespec="milliseconds"),
+             f"{svc['name']} was down while self-healing was off",
+             "Self-healing switched on: reconnected the service",
+             done.isoformat(timespec="milliseconds"), round((done - detected).total_seconds(), 2)))
+        conn.commit()
+        conn.close()
+    sms_breaker.record_success()      # close the circuit if it was left open
+    sync.state["lost"] = 0
+
+
 @app.route("/api/healing", methods=["GET", "POST"])
 def api_healing():
     if request.method == "POST":
         on = bool((request.get_json(silent=True) or {}).get("on"))
         set_healing(on)
+        if on and not heal_watch["was_on"]:
+            heal_services()
+        heal_watch["was_on"] = on
     return {"ok": True, "on": healing_on()}
 
 
@@ -437,7 +497,12 @@ def api_status():
             app_c = ("red", w["detail"])
 
     # SMS service (circuit breaker)
-    if sms_breaker.state == "closed":
+    if not healing_on():
+        if service_up(SERVICES["sms_service"]["health"]):
+            sms = ("green", "Answering. Not protected, because self-healing is off")
+        else:
+            sms = ("red", "Down. Nothing is protecting reminders, so texts are lost")
+    elif sms_breaker.state == "closed":
         sms = ("green", "Normal")
     elif sms_breaker.state == "open":
         sms = ("amber", f"Circuit open. Next test in {sms_breaker.retry_in()}s")
@@ -446,7 +511,9 @@ def api_status():
 
     # Cloud sync (offline queue)
     pending = sync.pending_count()
-    if not healing_on() and sync.state["lost"]:
+    if not healing_on() and not service_up(SERVICES["cloud_sync"]["health"]):
+        cloud = ("red", "Connection down. Nothing is saving doses for later, so they are lost")
+    elif not healing_on() and sync.state["lost"]:
         cloud = ("red", f"{sync.state['lost']} dose(s) never reached the caregiver. Nothing saved them")
     elif not sync.state["online"]:
         cloud = ("amber", f"Offline. {pending} dose(s) queued" if pending else "Offline. Saving doses on this device")
@@ -469,15 +536,6 @@ def api_status():
         isolated = quarantine.count()
         db_ = ("green", f"{isolated} bad record(s) isolated so far" if isolated else "No bad records")
 
-    # Traffic (load shedding)
-    rps = ratelimit.requests_per_second()
-    if ratelimit.shedding():
-        traffic = ("amber", f"Spike. Refusing one client's excess requests ({ratelimit.state['shed_total']} so far)")
-    elif not healing_on() and rps > 3 * ratelimit.RATE:
-        traffic = ("red", f"Overloaded: {rps} requests a second and nothing is protecting the app")
-    else:
-        traffic = ("green", "Normal")
-
     def card(name, pair):
         return {"name": name, "color": pair[0], "detail": pair[1]}
 
@@ -488,7 +546,6 @@ def api_status():
             card("SMS service", sms),
             card("Cloud sync", cloud),
             card("Database", db_),
-            card("Traffic", traffic),
         ],
         "healing": healing_on(),
         "incidents": enrich(incidents),
@@ -506,7 +563,7 @@ def _test_medicine(with_reminder):
     hm, today = now.strftime("%H:%M"), now.strftime("%Y-%m-%d")
     with data_lock:
         conn = get_db()
-        cur = conn.execute("INSERT INTO medicines (name, dose, times) VALUES ('Chaos test', '1 tablet', ?)", (hm,))
+        cur = conn.execute("INSERT INTO medicines (name, dose, times, created_day) VALUES ('Chaos test', '1 tablet', ?, ?)", (hm, today))
         med_id = cur.lastrowid
         if with_reminder:
             conn.execute(
@@ -536,11 +593,6 @@ def api_chaos(action):
         conn.commit()
         conn.close()
         return {"ok": True, "message": "Inserted a corrupted medicine record."}
-    if action == "flood":
-        mark_chaos("traffic")
-        subprocess.Popen([sys.executable, str(ROOT / "chaos.py"), "flood", "--seconds", "8"],
-                         cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return {"ok": True, "message": "Flooding the app with requests for 8 seconds…"}
     if action == "wipe":
         if valid_count() == 0:
             return {"ok": False, "message": "There is nothing to wipe. Add a medicine first."}, 400
@@ -582,18 +634,26 @@ def api_chaos(action):
             update_expected()
         return {"ok": True, "message": "Test data removed."}
     if action in CHAOS_LINKS:
+        url = CHAOS_LINKS[action]
         if action == "sms_down":
             mark_chaos("sms_service")
         if action == "cloud_down":
             mark_chaos("cloud_sync")
         try:
-            requests.get(CHAOS_LINKS[action], timeout=2)
-            msg = {"sms_down": "SMS service is down for 12 seconds. It comes back by itself.",
-                   "sms_up": "SMS service restored.", "cloud_down": "Connection to the caregiver cloud cut.",
-                   "cloud_up": "Connection restored."}[action]
-            return {"ok": True, "message": msg}
+            requests.get(url, timeout=2)
         except Exception:
             return {"ok": False, "message": "Could not reach that service. Is it running?"}, 502
+        if action in ("sms_down", "cloud_down"):
+            what = "SMS service" if action == "sms_down" else "Connection to the caregiver cloud"
+            if healing_on():
+                msg = (f"{what} is down. Self-healing will reconnect it automatically in about "
+                       f"{HEAL_AFTER['sms_service' if action == 'sms_down' else 'cloud_sync']} seconds.")
+            else:
+                msg = (f"{what} is down. Self-healing is off, so it stays down until you run "
+                       "python chaos.py restore, or switch self-healing back on.")
+        else:
+            msg = "SMS service restored." if action == "sms_up" else "Connection restored."
+        return {"ok": True, "message": msg}
     return {"ok": False, "message": "Unknown action."}, 404
 
 
@@ -723,12 +783,38 @@ def check_integrity():
             conn.close()
 
 
+down_since = {}
+
+
+def auto_heal():
+    """With self-healing on, a helper service that stays down is reconnected automatically after a few seconds."""
+    if not healing_on():
+        down_since.clear()
+        return
+    for comp, svc in SERVICES.items():
+        if service_up(svc["health"]):
+            down_since.pop(comp, None)
+            continue
+        first = down_since.setdefault(comp, time.time())
+        if time.time() - first >= HEAL_AFTER[comp]:
+            try:
+                requests.get(svc["up"], timeout=2)
+            except Exception:
+                continue            # the service is not running at all: nothing to reconnect
+            down_since.pop(comp, None)
+            _svc_cache.pop(svc["health"], None)
+
+
 def monitor_loop():
-    """Every second: traffic spikes and data loss."""
+    """Every second: data loss, and bringing helper services back when self-healing is switched on."""
     while True:
         time.sleep(1)
         try:
-            ratelimit.monitor()
+            on = healing_on()
+            if on and not heal_watch["was_on"]:     # switched on from the terminal (python chaos.py healing on)
+                heal_services()
+            heal_watch["was_on"] = on
+            auto_heal()
             check_integrity()
         except Exception as e:
             print("[monitor] error:", e)
