@@ -1,4 +1,4 @@
-/* MedTracker: shared front-end code (theme, connection light, toasts, dialogs, helpers). */
+/* MedlyDose: shared front-end code (theme, connection light, toasts, dialogs, helpers). */
 (function () {
   "use strict";
 
@@ -96,7 +96,7 @@
     return d.toLocaleDateString([], { day: "numeric", month: "short" }) + " " + t;
   }
 
-  const NAMES = { app: "App", sms_service: "SMS service", cloud_sync: "Cloud sync", database: "Database", traffic: "Traffic" };
+  const NAMES = { app: "App", sms_service: "SMS service", cloud_sync: "Cloud sync", database: "Database" };
   const WORDS = { green: "Healthy", amber: "Managing it", red: "Failed", unknown: "Unknown" };
 
   /* ---------- Dialogs ---------- */
@@ -157,7 +157,7 @@
     e.preventDefault();
     const err = $("#add-error");
     err.textContent = "";
-    if (!times.length) addTime();  // they typed a time but forgot to press Add time
+    addTime();  // a time typed but not yet added with the Add time button is saved too
 
     const name = $("#f-name").value.trim();
     const dose = $("#f-dose").value.trim();

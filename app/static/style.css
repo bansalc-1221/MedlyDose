@@ -1,4 +1,4 @@
-/* MedTracker: app styles.
+/* MedlyDose: app styles.
    Palette: Black #000000, White #FFFFFF, Baltic Blue #586994, Dust Grey #D5D5D5.
    Everything is built from those four. Dark theme: black base, Baltic Blue accent, Dust Grey text.
    Light theme: white base, Dust Grey lines, Baltic Blue accent and sidebar.
@@ -417,3 +417,47 @@ td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .chaos-card.cant-heal { border-style: dashed; }
 .chaos-card h3 .muted { font-weight: 500; font-size: 13px; color: var(--muted); }
 #log td:nth-child(3), #log td:nth-child(4) { min-width: 210px; }
+
+/* ---------- Gap under the "self-healing is off" warning ---------- */
+#heal-notice .notice { margin-bottom: 18px; }
+.chaos-card code { font-size: 12.5px; padding: 1px 5px; border-radius: 5px; background: var(--surface-2); color: var(--ink); }
+
+/* ---------- Calendar (Tracker page) ---------- */
+.cal { margin-top: 30px; }
+.cal-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.cal-head h2 { margin: 0; }
+.cal-nav { display: flex; gap: 8px; align-items: center; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.cal-wd { font-size: 12.5px; color: var(--muted); font-weight: 650; text-align: center; padding: 4px 0 6px; }
+.cal-btn { display: grid; align-content: center; justify-items: center; gap: 3px; min-height: 58px; padding: 6px 2px;
+           border: 1px solid transparent; border-radius: 12px; background: none; color: var(--ink); font: inherit; cursor: pointer; }
+.cal-btn:hover { background: var(--surface-2); }
+.cal-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cal-btn.is-selected { background: var(--accent-soft); border-color: var(--accent); }
+.cal-num { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cal-btn.is-today .cal-num { font-weight: 800; color: var(--accent-text); }
+.cal-count { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 14px; }
+.cal-dot { width: 7px; height: 7px; border-radius: 50%; background: transparent; }
+.cal-btn.all .cal-dot { background: var(--ok-dot); }
+.cal-btn.part .cal-dot { background: var(--warn-dot); }
+.cal-btn.miss .cal-dot { background: var(--bad-dot); }
+.cal-btn.todo .cal-dot { background: var(--muted); opacity: .55; }
+.cal-blank { min-height: 1px; }
+.cal-key { display: flex; gap: 6px 18px; flex-wrap: wrap; margin-top: 12px; font-size: 13px; color: var(--muted); }
+.cal-key span { display: inline-flex; align-items: center; gap: 7px; }
+.cal-key i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.cal-day { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line-soft); }
+.cal-day h3 { font-size: 16px; color: var(--ink-strong); margin-bottom: 8px; }
+.cal-list { list-style: none; margin: 0; padding: 0; }
+.cal-list li { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 10px 0; border-top: 1px solid var(--line-soft); }
+.cal-list li:first-child { border-top: 0; }
+.cal-list .t { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 650; }
+.cal-list .n { color: var(--ink-strong); font-weight: 600; }
+.cal-list .n small { color: var(--muted); font-weight: 400; font-size: 13.5px; }
+.cal-list .s { font-size: 13.5px; font-weight: 650; }
+.cal-list .s.taken { color: var(--ok); }
+.cal-list .s.missed { color: var(--bad); }
+.cal-list .s.due { color: var(--warn); }
+.cal-list .s.scheduled { color: var(--muted); }
+.cal-empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
+@media (max-width: 560px) { .cal-btn { min-height: 50px; } .cal-num { font-size: 14px; } .cal-count { font-size: 10.5px; } }
