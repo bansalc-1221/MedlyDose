@@ -4,5 +4,4 @@ __pycache__/
 *.db
 *.db-wal
 *.db-shm
-chaos_results.json
 commit_steps.sh
