@@ -52,7 +52,6 @@ body.landing { background: var(--bg); color: var(--ink); }
 .status-demo li { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line-soft);
                   font-weight: 650; color: var(--ink); }
 .status-demo .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ok-dot); }
-
 .foot { padding: 12px 0 44px; color: var(--muted); font-size: 13.5px; max-width: 70ch; }
 
 /* sign-in dialog */

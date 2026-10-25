@@ -31,7 +31,7 @@ CHAOS_LINKS = {
     "cloud_down": "http://127.0.0.1:5002/admin/down",
     "cloud_up": "http://127.0.0.1:5002/admin/up",
 }
-HEAL_AFTER = {"sms_service": 10, "cloud_sync": 8}   # with self-healing on, a service that stays down is reconnected after this many seconds
+HEAL_AFTER = {"sms_service": 6, "cloud_sync": 8}   # with self-healing on, a service that stays down is reconnected after this many seconds
 
 _svc_cache = {}
 
@@ -764,11 +764,11 @@ def reminder_loop():
 
 def check_integrity():
     """Notices a sudden loss of data (healthy medicines that were there are gone). It can see this but cannot undo it."""
-    expected = get_setting("expected_meds")
-    if expected is None:
-        update_expected()
-        return
     with data_lock:
+        expected = get_setting("expected_meds")      # read inside the lock, so a medicine being added or removed at this moment cannot cause a false alarm
+        if expected is None:
+            update_expected()
+            return
         actual = valid_count()
         if actual < int(expected) and not integrity["lost"]:
             now = datetime.now().isoformat(timespec="milliseconds")
@@ -803,6 +803,8 @@ def auto_heal():
                 continue            # the service is not running at all: nothing to reconnect
             down_since.pop(comp, None)
             _svc_cache.pop(svc["health"], None)
+            if comp == "sms_service" and sms_breaker.state == "open":
+                sms_breaker.opened_at = time.time() - sms_breaker.cooldown   # the service is back: test it on the next probe instead of waiting out the cooldown
 
 
 def monitor_loop():

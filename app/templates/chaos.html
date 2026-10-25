@@ -31,7 +31,7 @@
     </div>
 
     <div class="panel chaos-card">
-      <div><h3>SMS service</h3><p>Takes the reminder service offline. With self-healing on, the circuit breaker stops calling it and the app reconnects it automatically after about 10 seconds. With self-healing off it stays down until you run <code>python chaos.py restore</code>, or switch self-healing back on.</p></div>
+      <div><h3>SMS service</h3><p>Takes the reminder service offline. With self-healing on, the circuit breaker stops calling it and the app reconnects it automatically after about 6 seconds. With self-healing off it stays down until you run <code>python chaos.py restore</code>, or switch self-healing back on.</p></div>
       <div class="row"><button class="btn danger" data-action="sms_down" data-warn-off="With self-healing off, the SMS service stays down until you run python chaos.py restore in a terminal, or switch self-healing back on.">Take down</button></div>
     </div>
 
