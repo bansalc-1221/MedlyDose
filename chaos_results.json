@@ -2,22 +2,22 @@
   {
     "failure": "crash",
     "mode": "with",
+    "detected": 1.7,
+    "recovered": 2.7,
+    "note": "Restarted automatically"
+  },
+  {
+    "failure": "crash",
+    "mode": "with",
+    "detected": 2.2,
+    "recovered": 2.8,
+    "note": "Restarted automatically"
+  },
+  {
+    "failure": "crash",
+    "mode": "with",
     "detected": 0.5,
-    "recovered": 1.6,
-    "note": "Restarted automatically"
-  },
-  {
-    "failure": "crash",
-    "mode": "with",
-    "detected": 2.1,
-    "recovered": 3.2,
-    "note": "Restarted automatically"
-  },
-  {
-    "failure": "crash",
-    "mode": "with",
-    "detected": 0.6,
-    "recovered": 1.5,
+    "recovered": 1.0,
     "note": "Restarted automatically"
   },
   {
@@ -30,14 +30,14 @@
   {
     "failure": "freeze",
     "mode": "with",
-    "detected": 2.4,
-    "recovered": 11.3,
+    "detected": 2.3,
+    "recovered": 11.0,
     "note": "Killed and restarted automatically"
   },
   {
     "failure": "freeze",
     "mode": "with",
-    "detected": 2.4,
+    "detected": 2.5,
     "recovered": 11.1,
     "note": "Killed and restarted automatically"
   },
@@ -58,22 +58,22 @@
   {
     "failure": "sms",
     "mode": "with",
-    "detected": 3.9,
-    "recovered": 8.1,
-    "note": "Circuit opened, text sent once the service returned"
-  },
-  {
-    "failure": "sms",
-    "mode": "with",
-    "detected": 3.9,
+    "detected": 3.8,
     "recovered": 7.9,
     "note": "Circuit opened, text sent once the service returned"
   },
   {
     "failure": "sms",
     "mode": "with",
-    "detected": 4.0,
+    "detected": 3.9,
     "recovered": 8.2,
+    "note": "Circuit opened, text sent once the service returned"
+  },
+  {
+    "failure": "sms",
+    "mode": "with",
+    "detected": 3.8,
+    "recovered": 7.9,
     "note": "Circuit opened, text sent once the service returned"
   },
   {
@@ -86,22 +86,22 @@
   {
     "failure": "cloud",
     "mode": "with",
-    "detected": 2.0,
-    "recovered": 11.1,
+    "detected": 2.4,
+    "recovered": 11.5,
     "note": "Dose queued locally, synced after the connection returned"
   },
   {
     "failure": "cloud",
     "mode": "with",
-    "detected": 1.7,
-    "recovered": 10.9,
+    "detected": 2.7,
+    "recovered": 11.8,
     "note": "Dose queued locally, synced after the connection returned"
   },
   {
     "failure": "cloud",
     "mode": "with",
-    "detected": 1.6,
-    "recovered": 10.8,
+    "detected": 1.5,
+    "recovered": 10.6,
     "note": "Dose queued locally, synced after the connection returned"
   },
   {
@@ -114,22 +114,22 @@
   {
     "failure": "corrupt",
     "mode": "with",
-    "detected": 1.3,
-    "recovered": 1.3,
+    "detected": 0.9,
+    "recovered": 0.9,
     "note": "Record moved to quarantine"
   },
   {
     "failure": "corrupt",
     "mode": "with",
     "detected": 1.6,
-    "recovered": 1.7,
+    "recovered": 1.6,
     "note": "Record moved to quarantine"
   },
   {
     "failure": "corrupt",
     "mode": "with",
-    "detected": 1.5,
-    "recovered": 1.5,
+    "detected": 1.6,
+    "recovered": 1.6,
     "note": "Record moved to quarantine"
   },
   {
@@ -142,7 +142,7 @@
   {
     "failure": "wipe",
     "mode": "with",
-    "detected": 0.3,
+    "detected": 0.7,
     "recovered": null,
     "note": "Data is gone for good. The alarm is raised but nothing can restore it"
   }

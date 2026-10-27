@@ -4,7 +4,7 @@ MedlyDose helps a person (or a caregiver looking after them) take the right medi
 
 A missed or doubled dose can hurt someone, so MedlyDose must keep working when things break. It notices failures by itself, works out what went wrong, and recovers with no human restarting anything. Built for a self-healing software hackathon (scenario: our own, option E in the brief, a daily-life, high-stakes health app).
 
-Full write-up: see the Resilience Report (`MedlyDose_Resilience_Report.pdf`).
+Full write-up: see the Resilience Report (`Report/MedlyDose_Resilience_Report.pdf`). The AI Use Declaration is in `Report/MedlyDose_AI_Use_Declaration.pdf`.
 
 ## Run it
 
@@ -65,12 +65,12 @@ Measured with `python chaos.py` on one computer: 3 runs per failure with self-he
 
 | Failure | How it is detected | Detected after (s) | Back to normal after (s) | Without self-healing |
 |---|---|---|---|---|
-| App crashes | Watchdog sees the process has exited | 1.1 (2.1) | 2.1 (3.2) | Still down after 20 s. Nothing restarted it |
-| App freezes | Watchdog: 3 failed health checks in a row | 2.5 (2.6) | 11.3 (11.4) | Still frozen after 20 s. Nothing noticed |
-| SMS service outage | Circuit breaker: 3 failed checks of the SMS service | 3.9 (4.0) | 8.1 (8.2) | Text failed and was never sent, even after the service came back |
-| Internet to cloud drops | Sync loop pings the cloud every 3 s | 1.8 (2.0) | 10.9 (11.1) | The dose never reached the caregiver. It was dropped |
-| Corrupted record in database | Quarantine scan every 3 s validates every record | 1.5 (1.6) | 1.5 (1.7) | Bad record stays in the database, mixed with real data |
-| All data wiped | Integrity check: healthy medicines suddenly missing | 0.3 (0.3) | **Never. Not healed** | Same: nothing could restore it |
+| App crashes | Watchdog sees the process has exited | 1.5 (2.2) | 2.2 (2.8) | Still down after 20 s. Nothing restarted it |
+| App freezes | Watchdog: 3 failed health checks in a row | 2.5 (2.6) | 11.2 (11.4) | Still frozen after 20 s. Nothing noticed |
+| SMS service outage | Circuit breaker: 3 failed checks of the SMS service | 3.8 (3.9) | 8.0 (8.2) | Text failed and was never sent, even after the service came back |
+| Internet to cloud drops | Sync loop pings the cloud every 3 s | 2.2 (2.7) | 11.3 (11.8) | The dose never reached the caregiver. It was dropped |
+| Corrupted record in database | Quarantine scan every 3 s validates every record | 1.4 (1.6) | 1.4 (1.6) | Bad record stays in the database, mixed with real data |
+| All data wiped | Integrity check: healthy medicines suddenly missing | 0.7 (0.7) | **Never. Not healed** | Same: nothing could restore it |
 
 Times will differ a little on another machine. The raw numbers are in `chaos_results.json`.
 
@@ -89,6 +89,7 @@ watchdog.py, chaos.py, reset_alarm.py, show_incidents.py
 mock_sms/server.py, mock_cloud/server.py
 app/  main.py calendar_api.py db.py breaker.py sync.py quarantine.py  static/  templates/
 chaos_results.md, chaos_results.json
+Report/  MedlyDose_Resilience_Report.pdf, MedlyDose_AI_Use_Declaration.pdf
 ```
 
 ## AI use
